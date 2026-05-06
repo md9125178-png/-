@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // User Profile Rules
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.size() >= 2 &&
+               data.uid == request.auth.uid &&
+               data.email is string && data.email.size() <= 100;
+      }
+
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && 
+                      isValidUser(request.resource.data) &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'settings']);
+    }
+
+    // Transaction Rules (Income/Expense)
+    match /transactions/{transactionId} {
+      function isValidTransaction(data) {
+        return data.userId == request.auth.uid &&
+               data.type in ['income', 'expense'] &&
+               data.amount is number && data.amount > 0 &&
+               data.category is string && data.category.size() <= 50 &&
+               data.date is string && // Simple date string YYYY-MM-DD
+               (!('note' in data) || (data.note is string && data.note.size() <= 500));
+      }
+
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidTransaction(request.resource.data);
+      allow update: if isSignedIn() && 
+                      resource.data.userId == request.auth.uid &&
+                      isValidTransaction(request.resource.data) &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'category', 'date', 'note']);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Customer Rules
+    match /customers/{customerId} {
+      function isValidCustomer(data) {
+        return data.userId == request.auth.uid &&
+               data.name is string && data.name.size() <= 100 &&
+               (!('phone' in data) || (data.phone is string && data.phone.size() <= 20)) &&
+               (!('address' in data) || (data.address is string && data.address.size() <= 200));
+      }
+
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidCustomer(request.resource.data);
+      allow update: if isSignedIn() && 
+                      resource.data.userId == request.auth.uid &&
+                      isValidCustomer(request.resource.data) &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'address']);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Ledger Entry Rules
+    match /ledger_entries/{entryId} {
+      function isValidLedgerEntry(data) {
+        return data.userId == request.auth.uid &&
+               isValidId(data.customerId) &&
+               data.type in ['receivable', 'payable', 'received', 'paid'] &&
+               data.amount is number && data.amount > 0 &&
+               data.date is string &&
+               (!('note' in data) || (data.note is string && data.note.size() <= 500));
+      }
+
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && 
+                      isValidLedgerEntry(request.resource.data) &&
+                      exists(/databases/$(database)/documents/customers/$(request.resource.data.customerId));
+      allow update: if isSignedIn() && 
+                      resource.data.userId == request.auth.uid &&
+                      isValidLedgerEntry(request.resource.data) &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'type', 'date', 'note']);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+  }
+}

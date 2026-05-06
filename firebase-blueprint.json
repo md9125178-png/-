@@ -1,0 +1,88 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "language": { "type": "string", "enum": ["en", "bn"] },
+            "currency": { "type": "string" },
+            "theme": { "type": "string", "enum": ["light", "dark"] }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Income or Expense record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "amount", "category", "date"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer for ledger management",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name"]
+    },
+    "LedgerEntry": {
+      "title": "Ledger Entry",
+      "description": "A transaction tied to a specific customer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "type": { "type": "string", "enum": ["receivable", "payable", "received", "paid"] },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "customerId", "type", "amount", "date"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Income and expense transactions"
+    },
+    "customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Customer list"
+    },
+    "ledger_entries/{entryId}": {
+      "schema": "LedgerEntry",
+      "description": "Customer ledger transactions"
+    }
+  }
+}
